@@ -242,6 +242,13 @@ Set EDNS(0) client subnet SUBN=addr/prefix.
 \fB+\fP[\fBno\fP]\fBedns\fP[=\fIN\fP]
 Use EDNS version (default is 0).
 .TP
+\fB+\fP[\fBno\fP]\fBednsopt\fP[=\fICODE\fP[:VALUE]]
+Specify EDNS option with option code and optionally payload of value
+as a hexadecimal string.+noednsopt[=CODE] clears the EDNS option(s)
+to to be sent. Nsid, padding and subnet are edns options with additional
+input method. Using ednsopt for padding allows padding with nonzero values
+and is prioritized over +padding=N.
+.TP
 \fB+\fP[\fBno\fP]\fBtime\fP=\fIT\fP
 Set the wait\-for\-reply interval in seconds (default is 5 seconds). This timeout
 applies to each query attempt.

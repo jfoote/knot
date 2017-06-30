@@ -25,6 +25,7 @@
 #include "utils/common/msg.h"
 #include "utils/common/params.h"
 #include "utils/common/resolv.h"
+#include "utils/common/hex.h"
 #include "libknot/descriptor.h"
 #include "libknot/libknot.h"
 #include "contrib/base64.h"
@@ -37,6 +38,8 @@
 #define DEFAULT_RETRIES_DIG	2
 #define DEFAULT_TIMEOUT_DIG	5
 #define DEFAULT_ALIGNMENT_SIZE	128
+
+dynarray_define(ednsopt, edns_opt_t *, DYNARRAY_VISIBILITY_PUBLIC)
 
 static const flags_t DEFAULT_FLAGS_DIG = {
 	.aa_flag = false,
@@ -675,24 +678,6 @@ static int opt_notls_hostname(const char *arg, void *query)
 	return KNOT_EOK;
 }
 
-static int opt_nsid(const char *arg, void *query)
-{
-	query_t *q = query;
-
-	q->nsid = true;
-
-	return KNOT_EOK;
-}
-
-static int opt_nonsid(const char *arg, void *query)
-{
-	query_t *q = query;
-
-	q->nsid = false;
-
-	return KNOT_EOK;
-}
-
 static int opt_bufsize(const char *arg, void *query)
 {
 	query_t *q = query;
@@ -788,6 +773,8 @@ static int opt_subnet(const char *arg, void *query)
 	const size_t arg_len = strlen(arg);
 	const char   *arg_end = arg + arg_len;
 	size_t       addr_len = 0;
+	edns_opt_t   *option = NULL;
+	int          ret = KNOT_EOK;
 
 	knot_edns_client_subnet_t *subnet = calloc(1, sizeof(*subnet));
 	if (subnet == NULL) {
@@ -838,8 +825,44 @@ static int opt_subnet(const char *arg, void *query)
 		subnet->source_len = num;
 	}
 
-	free(q->subnet);
-	q->subnet = subnet;
+	size_t size = knot_edns_client_subnet_size(subnet);
+	uint8_t *data = malloc(sizeof(*data) * size);
+	if (data == NULL) {
+		free(subnet);
+		return KNOT_ENOMEM;
+	}
+
+	ret = knot_edns_client_subnet_write(data, size, subnet);
+	free(subnet);
+	if (ret != KNOT_EOK) {
+		free(data);
+		return ret;
+	}
+
+	dynarray_foreach(ednsopt, edns_opt_t *, opt, q->ednsopt) {
+		if ((*opt)->code == KNOT_EDNS_OPTION_CLIENT_SUBNET) {
+			option = *opt;
+		}
+	}
+
+	if (option == NULL) {
+		option = malloc(sizeof(*option));
+		if (option == NULL) {
+			free(data);
+			return KNOT_ENOMEM;
+		}
+		option->code = KNOT_EDNS_OPTION_CLIENT_SUBNET;
+		option->data = NULL;
+		ednsopt_dynarray_add(&q->ednsopt, &option);
+	}
+
+	if (option->data) {
+		free(option->data);
+	}
+
+	option->size = size;
+	option->data = data;
+	option->cleared = false;
 
 	return KNOT_EOK;
 }
@@ -848,10 +871,106 @@ static int opt_nosubnet(const char *arg, void *query)
 {
 	query_t *q = query;
 
-	free(q->subnet);
-	q->subnet = NULL;
+	dynarray_foreach(ednsopt, edns_opt_t *, opt, q->ednsopt) {
+		if ((*opt)->code == KNOT_EDNS_OPTION_CLIENT_SUBNET) {
+			(*opt)->cleared = true;
+			break;
+		}
+	}
 
 	return KNOT_EOK;
+}
+
+static int opt_ednsopt(const char *arg, void *query)
+{
+	char *datastr = NULL, *codestr = NULL, *pos = NULL;
+	uint16_t code;
+	uint8_t *data;
+	size_t size = 0;
+	int ret = KNOT_EOK;
+	query_t *q = query;
+	edns_opt_t *option = NULL;
+	char argcopy[strlen(arg)+1];
+
+	strcpy(argcopy, arg);
+
+	// EDNS option data
+	pos = strchr(argcopy, ':');
+	if (pos != NULL) {
+		datastr = strdup(pos+1);
+		ret = hex_decode(datastr, &data, &size);
+		if (ret != KNOT_EOK) {
+			ERR("invalid hex value +ednsopt=%s\n", arg);
+			goto ednsopt_fail;
+		}
+		*pos = '\0';
+	} else {
+		data = NULL;
+		size = 0;
+	}
+	// EDNS option code
+	codestr = strdup(argcopy);
+	ret = str_to_u16(codestr, &code);
+	if (ret != KNOT_EOK) {
+		ERR("invalid option code +ednsopt=%s\n", arg);
+		goto ednsopt_fail;
+	}
+
+	dynarray_foreach(ednsopt, edns_opt_t *, opt, q->ednsopt) {
+		if ((*opt)->code == code) {
+			option = *opt;
+			if (option->data) {
+				free(option->data);
+			}
+		}
+	}
+
+	if (option == NULL) {
+		option = malloc(sizeof(*option));
+		if (option == NULL) {
+			ret = KNOT_ENOMEM;
+			goto ednsopt_fail;
+		}
+		ednsopt_dynarray_add(&q->ednsopt, &option);
+	}
+
+	option->code = code;
+	option->size = size;
+	option->data = data;
+	option->cleared = false;
+	goto ednsopt_finish;
+
+ednsopt_fail:
+	free(data);
+	free(option);
+ednsopt_finish:
+	free(codestr);
+	free(datastr);
+	return ret;
+}
+
+static int opt_noednsopt(const char *arg, void *query)
+{
+	int ret = KNOT_EOK;
+	uint16_t code = 0;
+	bool all = arg? false : true;
+	query_t *q = query;
+
+	if (arg) {
+		ret = str_to_u16(arg, &code);
+		if (ret != KNOT_EOK) {
+			ERR("invalid option code +ednsopt=%s\n", arg);
+			return ret;
+		}
+	}
+
+	dynarray_foreach(ednsopt, edns_opt_t *, opt, q->ednsopt) {
+		if ((*opt)->code == code || all) {
+			(*opt)->cleared = true;
+		}
+	}
+
+	return ret;
 }
 
 static int opt_edns(const char *arg, void *query)
@@ -879,13 +998,28 @@ static int opt_noedns(const char *arg, void *query)
 
 	q->edns = -1;
 	opt_nodoflag(arg, query);
-	opt_nonsid(arg, query);
 	opt_nobufsize(arg, query);
 	opt_nopadding(arg, query);
 	opt_noalignment(arg, query);
-	opt_nosubnet(arg, query);
+	opt_noednsopt(arg, query);
 
 	return KNOT_EOK;
+}
+
+static int opt_nsid(const char *arg, void *query)
+{
+	char code[10];
+	sprintf(code, "%d", KNOT_EDNS_OPTION_NSID);
+
+	return opt_ednsopt(code, query);
+}
+
+static int opt_nonsid(const char *arg, void *query)
+{
+	char code[10];
+	sprintf(code, "%d", KNOT_EDNS_OPTION_NSID);
+
+	return opt_noednsopt(code, query);
 }
 
 static int opt_time(const char *arg, void *query)
@@ -1056,6 +1190,9 @@ static const param_t kdig_opts2[] = {
 	{ "edns",           ARG_OPTIONAL, opt_edns },
 	{ "noedns",         ARG_NONE,     opt_noedns },
 
+	{ "ednsopt",	    ARG_OPTIONAL, opt_ednsopt },
+	{ "noednsopt",	    ARG_NONE,     opt_noednsopt },
+
 	{ "time",           ARG_REQUIRED, opt_time },
 	{ "notime",         ARG_NONE,     opt_notime },
 
@@ -1108,13 +1245,10 @@ query_t *query_create(const char *owner, const query_t *conf)
 		query->flags = DEFAULT_FLAGS_DIG;
 		query->style = DEFAULT_STYLE_DIG;
 		query->idn = true;
-		query->nsid = false;
 		query->edns = -1;
 		query->padding = -1;
 		query->alignment = 0;
 		tls_params_init(&query->tls);
-		//query->tsig_key
-		query->subnet = NULL;
 #if USE_DNSTAP
 		query->dt_reader = NULL;
 		query->dt_writer = NULL;
@@ -1146,8 +1280,17 @@ query_t *query_create(const char *owner, const query_t *conf)
 		query->flags = conf->flags;
 		query->style = conf->style;
 		query->idn = conf->idn;
-		query->nsid = conf->nsid;
 		query->edns = conf->edns;
+		// Copy edns options
+		query_t *c = (query_t *) conf;
+		dynarray_foreach(ednsopt, edns_opt_t *, option, c->ednsopt) {
+			edns_opt_t *optcopy = malloc(sizeof(*optcopy));
+			memcpy(optcopy, *option, sizeof(*optcopy));
+			optcopy->data = malloc(sizeof(*optcopy->data)*(*option)->size);
+			memcpy(optcopy->data, (*option)->data,
+			       sizeof(*optcopy->data) * (*option)->size);
+			ednsopt_dynarray_add(&query->ednsopt, &optcopy);
+		}
 		query->padding = conf->padding;
 		query->alignment = conf->alignment;
 		tls_params_copy(&query->tls, &conf->tls);
@@ -1158,16 +1301,6 @@ query_t *query_create(const char *owner, const query_t *conf)
 				query_free(query);
 				return NULL;
 			}
-		}
-		if (conf->subnet != NULL) {
-			query->subnet = malloc(sizeof(*query->subnet));
-			if (query->subnet == NULL) {
-				query_free(query);
-				return NULL;
-			}
-			*(query->subnet) = *(conf->subnet);
-		} else {
-			query->subnet = NULL;
 		}
 #if USE_DNSTAP
 		query->dt_reader = conf->dt_reader;
@@ -1220,10 +1353,13 @@ void query_free(query_t *query)
 		}
 	}
 #endif // USE_DNSTAP
-
+	dynarray_foreach(ednsopt, edns_opt_t *, option, query->ednsopt) {
+		free((*option)->data);
+		free((*option));
+	}
+	ednsopt_dynarray_free(&query->ednsopt);
 	free(query->owner);
 	free(query->port);
-	free(query->subnet);
 	free(query);
 }
 
@@ -1607,49 +1743,51 @@ static void print_help(void)
 	       "            [-y [algo:]keyname:key] [-E tapfile] [-G tapfile]\n"
 	       "            name [type] [class] [@server]\n"
 	       "\n"
-	       "       +[no]multiline        Wrap long records to more lines.\n"
-	       "       +[no]short            Show record data only.\n"
-	       "       +[no]generic          Use generic representation format.\n"
-	       "       +[no]aaflag           Set AA flag.\n"
-	       "       +[no]tcflag           Set TC flag.\n"
-	       "       +[no]rdflag           Set RD flag.\n"
-	       "       +[no]recurse          Same as +[no]rdflag\n"
-	       "       +[no]raflag           Set RA flag.\n"
-	       "       +[no]zflag            Set zero flag bit.\n"
-	       "       +[no]adflag           Set AD flag.\n"
-	       "       +[no]cdflag           Set CD flag.\n"
-	       "       +[no]dnssec           Set DO flag.\n"
-	       "       +[no]all              Show all packet sections.\n"
-	       "       +[no]qr               Show query packet.\n"
-	       "       +[no]header           Show packet header.\n"
-	       "       +[no]opt              Show EDNS pseudosection.\n"
-	       "       +[no]question         Show question section.\n"
-	       "       +[no]answer           Show answer section.\n"
-	       "       +[no]authority        Show authority section.\n"
-	       "       +[no]additional       Show additional section.\n"
-	       "       +[no]tsig             Show TSIG pseudosection.\n"
-	       "       +[no]stats            Show trailing packet statistics.\n"
-	       "       +[no]class            Show DNS class.\n"
-	       "       +[no]ttl              Show TTL value.\n"
-	       "       +[no]crypto           Show binary parts of RRSIGs and DNSKEYs.\n"
-	       "       +[no]tcp              Use TCP protocol.\n"
-	       "       +[no]ignore           Don't use TCP automatically if truncated.\n"
-	       "       +[no]tls              Use TLS with Opportunistic privacy profile.\n"
-	       "       +[no]tls-ca[=FILE]    Use TLS with Out-Of-Band privacy profile.\n"
-	       "       +[no]tls-pin=BASE64   Use TLS with pinned certificate.\n"
-	       "       +[no]tls-hostname=STR Use TLS with remote server hostname.\n"
-	       "       +[no]nsid             Request NSID.\n"
-	       "       +[no]bufsize=B        Set EDNS buffer size.\n"
-	       "       +[no]padding[=N]      Pad with EDNS(0) (default or specify size).\n"
-	       "       +[no]alignment[=N]    Pad with EDNS(0) to blocksize (%u or specify size).\n"
-	       "       +[no]subnet=SUBN      Set EDNS(0) client subnet addr/prefix.\n"
-	       "       +[no]edns[=N]         Use EDNS(=version).\n"
-	       "       +[no]time=T           Set wait for reply interval in seconds.\n"
-	       "       +[no]retry=N          Set number of retries.\n"
-	       "       +noidn                Disable IDN transformation.\n"
+	       "       +[no]multiline              Wrap long records to more lines.\n"
+	       "       +[no]short                  Show record data only.\n"
+	       "       +[no]generic                Use generic representation format.\n"
+	       "       +[no]aaflag                 Set AA flag.\n"
+	       "       +[no]tcflag                 Set TC flag.\n"
+	       "       +[no]rdflag                 Set RD flag.\n"
+	       "       +[no]recurse                Same as +[no]rdflag\n"
+	       "       +[no]raflag                 Set RA flag.\n"
+	       "       +[no]zflag                  Set zero flag bit.\n"
+	       "       +[no]adflag                 Set AD flag.\n"
+	       "       +[no]cdflag                 Set CD flag.\n"
+	       "       +[no]dnssec                 Set DO flag.\n"
+	       "       +[no]all                    Show all packet sections.\n"
+	       "       +[no]qr                     Show query packet.\n"
+	       "       +[no]header                 Show packet header.\n"
+	       "       +[no]opt                    Show EDNS pseudosection.\n"
+	       "       +[no]question               Show question section.\n"
+	       "       +[no]answer                 Show answer section.\n"
+	       "       +[no]authority              Show authority section.\n"
+	       "       +[no]additional             Show additional section.\n"
+	       "       +[no]tsig                   Show TSIG pseudosection.\n"
+	       "       +[no]stats                  Show trailing packet statistics.\n"
+	       "       +[no]class                  Show DNS class.\n"
+	       "       +[no]ttl                    Show TTL value.\n"
+	       "       +[no]crypto                 Show binary parts of RRSIGs and DNSKEYs.\n"
+	       "       +[no]tcp                    Use TCP protocol.\n"
+	       "       +[no]ignore                 Don't use TCP automatically if truncated.\n"
+	       "       +[no]tls                    Use TLS with Opportunistic privacy profile.\n"
+	       "       +[no]tls-ca[=FILE]          Use TLS with Out-Of-Band privacy profile.\n"
+	       "       +[no]tls-pin=BASE64         Use TLS with pinned certificate.\n"
+	       "       +[no]tls-hostname=STR       Use TLS with remote server hostname.\n"
+	       "       +[no]nsid                   Request NSID.\n"
+	       "       +[no]bufsize=B              Set EDNS buffer size.\n"
+	       "       +[no]padding[=N]            Pad with EDNS(0) (default or specify size).\n"
+	       "       +[no]alignment[=N]          Pad with EDNS(0) to blocksize (%u or specify size).\n"
+	       "       +[no]subnet=SUBN            Set EDNS(0) client subnet addr/prefix.\n"
+	       "       +[no]edns[=N]               Use EDNS(=version).\n"
+	       "       +[no]ednsopt[=CODE[:VALUE]] Specify EDNS option with option code and optionally payload of value as a hexadecimal string.\n"
+	       "                                   +noednsopt[=code] clears the EDNS option(s) to to be sent.\n"
+	       "       +[no]time=T                 Set wait for reply interval in seconds.\n"
+	       "       +[no]retry=N                Set number of retries.\n"
+	       "       +noidn                      Disable IDN transformation.\n"
 	       "\n"
-	       "       -h, --help            Print the program help.\n"
-	       "       -V, --version         Print the program version.\n",
+	       "       -h, --help                  Print the program help.\n"
+	       "       -V, --version               Print the program version.\n",
 	       PROGRAM_NAME, DEFAULT_ALIGNMENT_SIZE);
 }
 

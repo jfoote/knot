@@ -31,6 +31,7 @@
 #include "utils/common/sign.h"
 #include "libknot/libknot.h"
 #include "contrib/sockaddr.h"
+#include "contrib/dynarray.h"
 
 #if USE_DNSTAP
 # include "contrib/dnstap/reader.h"
@@ -68,6 +69,16 @@ typedef struct {
 	/*!< DNSSEC OK flag. */
 	bool	do_flag;
 } flags_t;
+
+typedef struct {
+	uint16_t code;
+	uint16_t size;
+	uint8_t *data;
+	/*!< Option cleared with +noednsopt=[<code>] */
+	bool cleared;
+} edns_opt_t;
+
+dynarray_declare(ednsopt, edns_opt_t *, DYNARRAY_VISIBILITY_PUBLIC, 5)
 
 /*! \brief Basic parameters for DNS query. */
 typedef struct query query_t; // Forward declaration due to configuration.
@@ -112,14 +123,12 @@ struct query {
 	style_t		style;
 	/*!< IDN conversion. */
 	bool		idn;
-	/*!< Query for NSID. */
-	bool		nsid;
 	/*!< EDNS version (8unsigned + -1 uninitialized). */
 	int16_t		edns;
+	/*!< EDNS options to be send */
+	ednsopt_dynarray_t ednsopt;
 	/*!< Transaction signature. */
 	knot_tsig_key_t tsig_key;
-	/*!< EDNS client subnet. */
-	knot_edns_client_subnet_t *subnet;
 	/*!< EDNS0 padding (16unsigned + -1 ~ uninitialized, -2 ~ default, -3 ~ none). */
 	int32_t		padding;
 	/*!< Query alignment with EDNS0 padding (0 ~ uninitialized). */
