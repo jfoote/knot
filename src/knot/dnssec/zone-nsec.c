@@ -172,8 +172,8 @@ knot_dname_t *knot_create_nsec3_owner(const knot_dname_t *owner,
 		return NULL;
 	}
 
-	int owner_size = knot_dname_size(owner);
-	if (owner_size < 0) {
+	size_t owner_size = knot_dname_size(owner);
+	if (owner_size == 0) {
 		return NULL;
 	}
 

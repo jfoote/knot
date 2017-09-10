@@ -1,4 +1,4 @@
-/*  Copyright (C) 2016 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -71,12 +71,8 @@ int knot_zonedb_insert(knot_zonedb_t *db, zone_t *zone)
 		return KNOT_EINVAL;
 	}
 
-	int name_size = knot_dname_size(zone->name);
-	if (name_size < 0) {
-		return KNOT_EINVAL;
-	}
-
-	return hhash_insert(db->hash, (const char*)zone->name, name_size, zone);
+	return hhash_insert(db->hash, (const char *)zone->name,
+	                    knot_dname_size(zone->name), zone);
 }
 
 int knot_zonedb_del(knot_zonedb_t *db, const knot_dname_t *zone_name)
@@ -87,9 +83,9 @@ int knot_zonedb_del(knot_zonedb_t *db, const knot_dname_t *zone_name)
 
 	/* Can't guess maximum label count now. */
 	db->maxlabels = KNOT_DNAME_MAXLABELS;
+
 	/* Attempt to remove zone. */
-	int name_size = knot_dname_size(zone_name);
-	return hhash_del(db->hash, (const char*)zone_name, name_size);
+	return hhash_del(db->hash, (const char *)zone_name, knot_dname_size(zone_name));
 }
 
 int knot_zonedb_build_index(knot_zonedb_t *db)
@@ -124,12 +120,11 @@ static value_t *find_name(knot_zonedb_t *db, const knot_dname_t *dname, uint16_t
 
 zone_t *knot_zonedb_find(knot_zonedb_t *db, const knot_dname_t *zone_name)
 {
-	int name_size = knot_dname_size(zone_name);
-	if (!db || name_size < 1) {
+	if (db == NULL || zone_name == NULL) {
 		return NULL;
 	}
 
-	value_t *ret = find_name(db, zone_name, name_size);
+	value_t *ret = find_name(db, zone_name, knot_dname_size(zone_name));
 	if (ret == NULL) {
 		return NULL;
 	}
@@ -153,7 +148,7 @@ zone_t *knot_zonedb_find_suffix(knot_zonedb_t *db, const knot_dname_t *dname)
 
 	/* Compare possible suffixes. */
 	value_t *val = NULL;
-	int name_size = knot_dname_size(dname);
+	size_t name_size = knot_dname_size(dname);
 	while (name_size > 0) { /* Include root label. */
 		val = find_name(db, dname, name_size);
 		if (val != NULL) {

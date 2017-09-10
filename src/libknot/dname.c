@@ -114,8 +114,8 @@ knot_dname_t *knot_dname_parse(const uint8_t *pkt, size_t *pos, size_t maxpos,
 	}
 
 	/* Calculate decompressed length. */
-	int decompressed_len = knot_dname_realsize(name, pkt);
-	if (decompressed_len < 1) {
+	size_t decompressed_len = knot_dname_realsize(name, pkt);
+	if (decompressed_len == 0) {
 		return NULL;
 	}
 
@@ -138,9 +138,6 @@ knot_dname_t *knot_dname_parse(const uint8_t *pkt, size_t *pos, size_t maxpos,
 _public_
 knot_dname_t *knot_dname_copy(const knot_dname_t *name, knot_mm_t *mm)
 {
-	if (name == NULL)
-		return NULL;
-
 	return knot_dname_copy_part(name, knot_dname_size(name), mm);
 }
 
@@ -169,7 +166,7 @@ int knot_dname_to_wire(uint8_t *dst, const knot_dname_t *src, size_t maxlen)
 		return KNOT_EINVAL;
 	}
 
-	int len = knot_dname_size(src);
+	size_t len = knot_dname_size(src);
 	if (len > maxlen) {
 		return KNOT_ESPACE;
 	}
@@ -216,10 +213,7 @@ char *knot_dname_to_str(char *dst, const knot_dname_t *name, size_t maxlen)
 		return NULL;
 	}
 
-	int dname_size = knot_dname_size(name);
-	if (dname_size <= 0) {
-		return NULL;
-	}
+	size_t dname_size = knot_dname_size(name);
 
 	/* Check the size for len(dname) + 1 char termination. */
 	size_t alloc_size = (dst == NULL) ? dname_size + 1 : maxlen;
@@ -479,10 +473,11 @@ int knot_dname_to_lower(knot_dname_t *name)
 
 /*----------------------------------------------------------------------------*/
 _public_
-int knot_dname_size(const knot_dname_t *name)
+size_t knot_dname_size(const knot_dname_t *name)
 {
-	if (name == NULL)
-		return KNOT_EINVAL;
+	if (name == NULL) {
+		return 0;
+	}
 
 	/* Count name size without terminal label. */
 	int len = 0;
@@ -493,15 +488,16 @@ int knot_dname_size(const knot_dname_t *name)
 	}
 
 	/* Compression pointer is 2 octets. */
-	if (knot_wire_is_pointer(name))
+	if (knot_wire_is_pointer(name)) {
 		return len + 2;
+	}
 
 	return len + 1;
 }
 
 /*----------------------------------------------------------------------------*/
 _public_
-int knot_dname_realsize(const knot_dname_t *name, const uint8_t *pkt)
+size_t knot_dname_realsize(const knot_dname_t *name, const uint8_t *pkt)
 {
 	/* Add zero label size for FQDN. */
 	return knot_dname_prefixlen(name, KNOT_DNAME_MAXLABELS, pkt) + 1;
@@ -610,10 +606,11 @@ knot_dname_t *knot_dname_replace_suffix(const knot_dname_t *name, unsigned label
 	assert(dname_lbs >= labels);
 	unsigned prefix_lbs = dname_lbs - labels;
 
-	int prefix_len = knot_dname_prefixlen(name, prefix_lbs, NULL);
-	int suffix_len = knot_dname_size(suffix);
-	if (prefix_len < 0 || suffix_len < 0)
+	size_t prefix_len = knot_dname_prefixlen(name, prefix_lbs, NULL);
+	size_t suffix_len = knot_dname_size(suffix);
+	if (prefix_len == 0 || suffix_len == 0) {
 		return NULL;
+	}
 
 	/* Create target name. */
 	int new_len = prefix_len + suffix_len;
@@ -745,14 +742,16 @@ knot_dname_t *knot_dname_cat(knot_dname_t *d1, const knot_dname_t *d2)
 
 /*----------------------------------------------------------------------------*/
 _public_
-int knot_dname_prefixlen(const uint8_t *name, unsigned nlabels, const uint8_t *pkt)
+size_t knot_dname_prefixlen(const uint8_t *name, unsigned nlabels, const uint8_t *pkt)
 {
-	if (name == NULL)
-		return KNOT_EINVAL;
+	if (name == NULL) {
+		return 0;
+	}
 
 	/* Zero labels means no prefix. */
-	if (nlabels == 0)
+	if (nlabels == 0) {
 		return 0;
+	}
 
 	/* Seek first real label occurrence. */
 	name = knot_wire_seek_label(name, pkt);
@@ -761,8 +760,9 @@ int knot_dname_prefixlen(const uint8_t *name, unsigned nlabels, const uint8_t *p
 	while (*name != '\0') {
 		len += *name + 1;
 		name = knot_wire_next_label(name, pkt);
-		if (--nlabels == 0) /* Count N first labels only. */
+		if (--nlabels == 0) { /* Count N first labels only. */
 			break;
+		}
 	}
 
 	return len;

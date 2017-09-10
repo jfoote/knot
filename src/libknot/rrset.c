@@ -228,12 +228,7 @@ int knot_rrset_rr_to_canonical(knot_rrset_t *rrset)
 				return ret;
 			}
 
-			ret = knot_dname_size(pos);
-			if (ret < 0) {
-				return ret;
-			}
-
-			pos += ret;
+			pos += knot_dname_size(pos);
 			break;
 		case KNOT_RDATA_WF_NAPTR_HEADER:
 			ret = knot_naptr_header_size(pos, endpos);
@@ -263,8 +258,6 @@ size_t knot_rrset_size(const knot_rrset_t *rrset)
 	}
 
 	uint16_t rr_count = rrset->rrs.rr_count;
-
-	assert(rrset->owner);
 	size_t total_size = knot_dname_size(rrset->owner) * rr_count;
 
 	for (size_t i = 0; i < rr_count; ++i) {

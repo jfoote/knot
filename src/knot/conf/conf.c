@@ -159,7 +159,7 @@ conf_val_t conf_zone_get_txn(
 		return val;
 	}
 
-	int dname_size = knot_dname_size(dname);
+	size_t dname_size = knot_dname_size(dname);
 
 	// Try to get explicit value.
 	conf_db_get(conf, txn, C_ZONE, key1_name, dname, dname_size, &val);
@@ -909,7 +909,7 @@ static int str_label(
 	unsigned index = labels - right_index - 1;
 
 	// Create a dname from the single label.
-	int prefix = (index > 0) ? knot_dname_prefixlen(zone, index, NULL) : 0;
+	size_t prefix = (index > 0) ? knot_dname_prefixlen(zone, index, NULL) : 0;
 	unsigned label_len = *(zone + prefix);
 	memcpy(label, zone + prefix, 1 + label_len);
 	label[1 + label_len] = '\0';

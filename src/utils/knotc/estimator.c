@@ -69,8 +69,8 @@ static int dummy_node_add_type(list_t *l, uint16_t t)
 static int insert_dname_into_table(trie_t *table, const knot_dname_t *d,
                                    list_t **dummy_node)
 {
-	int d_size = knot_dname_size(d);
-	if (d_size < 0) {
+	size_t d_size = knot_dname_size(d);
+	if (d_size == 0) {
 		return KNOT_EINVAL;
 	}
 

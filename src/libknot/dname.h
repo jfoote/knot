@@ -188,10 +188,10 @@ int knot_dname_to_lower(knot_dname_t *name);
  * \param name Domain name to get the size of.
  *
  * \retval size of the domain name.
- * \retval KNOT_EINVAL
+ * \retval 0 if invalid argument.
  */
 _pure_
-int knot_dname_size(const knot_dname_t *name);
+size_t knot_dname_size(const knot_dname_t *name);
 
 /*!
  * \brief Returns wire size of the given domain name (expanded compression ptrs).
@@ -200,10 +200,10 @@ int knot_dname_size(const knot_dname_t *name);
  * \param pkt Related packet (or NULL if unpacked)
  *
  * \retval size of the domain name.
- * \retval KNOT_EINVAL
+ * \retval 0 if invalid argument.
  */
 _pure_
-int knot_dname_realsize(const knot_dname_t *name, const uint8_t *pkt);
+size_t knot_dname_realsize(const knot_dname_t *name, const uint8_t *pkt);
 
 /*!
  * \brief Checks if one domain name is a subdomain of other.
@@ -336,7 +336,7 @@ bool knot_dname_label_is_equal(const uint8_t *label1, const uint8_t *label2);
 knot_dname_t *knot_dname_cat(knot_dname_t *d1, const knot_dname_t *d2);
 
 /*!
- * \brief Cound length of the N first labels.
+ * \brief Count length of the N first labels.
  *
  * \param name Domain name.
  * \param nlabels N first labels.
@@ -345,7 +345,7 @@ knot_dname_t *knot_dname_cat(knot_dname_t *d1, const knot_dname_t *d2);
  * \retval length of the prefix
  */
 _pure_
-int knot_dname_prefixlen(const uint8_t *name, unsigned nlabels, const uint8_t *pkt);
+size_t knot_dname_prefixlen(const uint8_t *name, unsigned nlabels, const uint8_t *pkt);
 
 /*!
  * \brief Return number of labels in the domain name.

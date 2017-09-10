@@ -80,7 +80,7 @@ static int dname_cname_synth(const knot_rrset_t *dname_rr,
 	}
 
 	/* Store DNAME into RDATA. */
-	int cname_size = knot_dname_size(cname);
+	size_t cname_size = knot_dname_size(cname);
 	uint8_t cname_rdata[cname_size];
 	memcpy(cname_rdata, cname, cname_size);
 	knot_dname_free(&cname, NULL);

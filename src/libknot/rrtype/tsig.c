@@ -68,7 +68,7 @@ static uint8_t* rdata_seek(const knot_rrset_t *rr, tsig_off_t id, size_t nb)
 	                                      knot_rdata_rdlen(rr_data));
 
 	/* TSIG RR names should be already sanitized on parse. */
-	int alg_len = knot_dname_size(wire.wire);
+	size_t alg_len = knot_dname_size(wire.wire);
 
 	/* Not pretty, but fast. */
 	switch (id) {
@@ -137,9 +137,9 @@ int knot_tsig_create_rdata(knot_rrset_t *rr, const knot_dname_t *alg,
 		return KNOT_EINVAL;
 	}
 
-	int alg_len = knot_dname_size(alg);
-	if (alg_len < 0) {
-		return alg_len;
+	size_t alg_len = knot_dname_size(alg);
+	if (alg_len == 0) {
+		return KNOT_EINVAL;
 	}
 
 	size_t rdlen = alg_len + TSIG_FIXED_RDLEN + maclen;
@@ -377,13 +377,13 @@ size_t knot_tsig_wire_size(const knot_tsig_key_t *key)
 		return 0;
 	}
 
-	int key_len = knot_dname_size(key->name);
-	if (key_len < 0) {
+	size_t key_len = knot_dname_size(key->name);
+	if (key_len == 0) {
 		return 0;
 	}
 
-	int alg_len = knot_dname_size(dnssec_tsig_algorithm_to_dname(key->algorithm));
-	if (alg_len < 0) {
+	size_t alg_len = knot_dname_size(dnssec_tsig_algorithm_to_dname(key->algorithm));
+	if (alg_len == 0) {
 		return 0;
 	}
 

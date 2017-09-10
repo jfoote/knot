@@ -78,8 +78,8 @@ knot_dname_t *online_nsec_next(const knot_dname_t *dname, const knot_dname_t *ap
 
 	// right aligned copy of the domain name
 	uint8_t copy[KNOT_DNAME_MAXLEN] = { 0 };
-	int dname_len = knot_dname_size(dname);
-	int empty_len = sizeof(copy) - dname_len;
+	size_t dname_len = knot_dname_size(dname);
+	size_t empty_len = sizeof(copy) - dname_len;
 	uint8_t *pos = copy + empty_len;
 	memmove(pos, dname, dname_len);
 
@@ -92,7 +92,7 @@ knot_dname_t *online_nsec_next(const knot_dname_t *dname, const knot_dname_t *ap
 	}
 
 	// find apex position in the buffer
-	int apex_len = knot_dname_size(apex);
+	size_t apex_len = knot_dname_size(apex);
 	const uint8_t *apex_pos = copy + sizeof(copy) - apex_len;
 	assert(knot_dname_cmp(apex, apex_pos) == 0);
 
