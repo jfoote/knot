@@ -14,6 +14,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <pthread.h>
+#include <unistd.h>
+
 #include "knot/include/module.h"
 #include "knot/nameserver/process_query.h"
 #include "libknot/cookies/server.h"
@@ -27,7 +30,8 @@
 #define COOKIES_CC_LEN KNOT_OPT_COOKIE_CLNT
 #define COOKIES_NONCE_LEN 8
 #define COOKIES_HASH_LEN 8
-#define COOKIES_BADCOOKIE_DROP_RATE 2
+#define COOKIES_BADCOOKIE_DROP_RATE 1
+#define COOKIES_REFRESH_TIME 26*60 // 26 hours
 
 typedef struct knot_sc_private knot_sc_private_t;
 typedef struct knot_dns_cookies knot_dns_cookies_t;
@@ -35,13 +39,16 @@ typedef struct knot_sc_alg knot_sc_alg_t;
 typedef struct knot_sc_input knot_sc_input_t;
 
 typedef struct {
-	uint8_t *server_secret;
+	uint64_t server_secret;
 	knot_time_t secret_gen_time; // Last time the server secret was generated
 	uint16_t badcookie_ctr; // Counter for BADCOOKIE answers
+	pthread_t update_secret;
 } cookies_ctx_t;
 
 static void update_ctr(cookies_ctx_t *ctx)
 {
+	assert(ctx);
+
 	if (++ctx->badcookie_ctr == COOKIES_BADCOOKIE_DROP_RATE) {
 		ctx->badcookie_ctr = 0;
 	}
@@ -49,13 +56,13 @@ static void update_ctr(cookies_ctx_t *ctx)
 
 static int generate_secret(cookies_ctx_t *ctx)
 {
-	// Free the previous secret if present
-	if (ctx->server_secret != NULL) {
-		free(ctx->server_secret);
-	}
+	assert(ctx);
 
-	// Generate new secret
-	int ret = dnssec_random_buffer(ctx->server_secret, COOKIES_SECRET_LEN);
+	// Generate a new secret and store it atomically
+	uint64_t new_secret;
+	int ret = dnssec_random_buffer((uint8_t *)&new_secret, COOKIES_SECRET_LEN);
+	__atomic_store_n(&ctx->server_secret, new_secret, __ATOMIC_RELAXED);
+
 	if (ret != KNOT_EOK) {
 		return ret;
 	}
@@ -66,10 +73,29 @@ static int generate_secret(cookies_ctx_t *ctx)
 	return KNOT_EOK;
 }
 
-// Inserts the current cookie option into the answer's OPT RR
-static int put_cookie(knotd_qdata_t *qdata, knot_pkt_t *pkt,
-                             const uint8_t *cc, knot_sc_private_t *srvr_data)
+static void *update_secret(void *data)
 {
+	knotd_mod_t *mod = (knotd_mod_t *)data;
+	cookies_ctx_t *ctx = knotd_mod_ctx(mod);
+
+	while (true) {
+		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+		if (generate_secret(ctx) != KNOT_EOK) {
+			knotd_mod_log(mod, LOG_DEBUG, "Failed to generate a secret.\n");
+		};
+		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+		sleep(COOKIES_REFRESH_TIME);
+	}
+
+	return NULL;
+}
+
+// Inserts the current cookie option into the answer's OPT RR
+static int put_cookie(cookies_ctx_t *ctx, knotd_qdata_t *qdata, knot_pkt_t *pkt,
+                      const uint8_t *cc, knot_sc_private_t *srvr_data)
+{
+	assert(ctx && qdata && pkt && cc && srvr_data);
+
 	// Reserve space in the answer's OPT RR
 	uint8_t *wire_ptr = NULL;
 	uint16_t size = knot_edns_opt_cookie_data_len(COOKIES_CC_LEN, COOKIES_SC_LEN);
@@ -81,9 +107,9 @@ static int put_cookie(knotd_qdata_t *qdata, knot_pkt_t *pkt,
 
 	// Compute the new server cookie
 	uint8_t sc[COOKIES_SC_LEN];
-	knot_time_t timestamp = (knot_time_t)time(NULL);
 
 	// First 8 bytes are the current time
+	knot_time_t timestamp = (knot_time_t)time(NULL);
 	memcpy(sc, &timestamp, COOKIES_NONCE_LEN);
 
 	knot_sc_input_t sc_input = {
@@ -104,7 +130,7 @@ static int put_cookie(knotd_qdata_t *qdata, knot_pkt_t *pkt,
 	// Write the prepared cookie to the wire
 	ret = knot_edns_opt_cookie_write(cc, COOKIES_CC_LEN, sc, COOKIES_SC_LEN,
 	                                 wire_ptr, size);
-	if (ret != KNOT_EOK) {
+	if (ret <= 0) {
 		return ret;
 	}
 
@@ -113,7 +139,7 @@ static int put_cookie(knotd_qdata_t *qdata, knot_pkt_t *pkt,
 }
 
 static knotd_state_t cookies_process(knotd_state_t state, knot_pkt_t *pkt,
-                                 knotd_qdata_t *qdata, knotd_mod_t *mod)
+                                     knotd_qdata_t *qdata, knotd_mod_t *mod)
 {
 	assert(pkt && qdata && mod);
 
@@ -143,15 +169,16 @@ static knotd_state_t cookies_process(knotd_state_t state, knot_pkt_t *pkt,
 	}
 
 	// Prepare data for server cookie computation
+	uint64_t current_secret = __atomic_load_n(&ctx->server_secret, __ATOMIC_RELAXED);
 	knot_sc_private_t srvr_data = {
 		.clnt_sockaddr = (struct sockaddr *)qdata->params->remote,
-		.secret_data = ctx->server_secret,
+		.secret_data = (uint8_t *)&current_secret,
 		.secret_len = COOKIES_SECRET_LEN
 	};
 
 	// If this is a TCP connection, just answer with the current server cookie
 	if (!(qdata->params->flags & KNOTD_QUERY_FLAG_LIMIT_SIZE)) {
-		ret = put_cookie(qdata, pkt, cookies.cc, &srvr_data);
+		ret = put_cookie(ctx, qdata, pkt, cookies.cc, &srvr_data);
 		if (ret != KNOT_EOK) {
 			qdata->rcode = KNOT_RCODE_SERVFAIL;
 			return KNOTD_STATE_FAIL;
@@ -163,22 +190,20 @@ static knotd_state_t cookies_process(knotd_state_t state, knot_pkt_t *pkt,
 	ret = knot_sc_check(COOKIES_NONCE_LEN, &cookies, &srvr_data, &knot_sc_alg_fnv64);
 
 	if (ret == KNOT_EOK) {
-		ret = put_cookie(qdata, pkt, cookies.cc, &srvr_data);
+		ret = put_cookie(ctx, qdata, pkt, cookies.cc, &srvr_data);
 		if (ret != KNOT_EOK) {
 			qdata->rcode = KNOT_RCODE_SERVFAIL;
 			return KNOTD_STATE_FAIL;
 		}
 		return state;
-	}
-	else {
+	} else {
 		if (ctx->badcookie_ctr > 0) {
 			// Silently drop the response
 			update_ctr(ctx);
 			return KNOTD_STATE_NOOP;
-		}
-		else {
+		} else {
 			update_ctr(ctx);
-			ret = put_cookie(qdata, pkt, cookies.cc, &srvr_data);
+			ret = put_cookie(ctx, qdata, pkt, cookies.cc, &srvr_data);
 			if (ret != KNOT_EOK) {
 				qdata->rcode = KNOT_RCODE_SERVFAIL;
 				return KNOTD_STATE_FAIL;
@@ -199,11 +224,10 @@ int cookies_load(knotd_mod_t *mod)
 		return KNOT_ENOMEM;
 	}
 
-	// Generate the first server secret
-	int ret = generate_secret(ctx);
-	if (ret != KNOT_EOK) {
-		return knot_error_from_libdnssec(ret);
-	}
+	// Start the secret rollover thread
+	if (pthread_create(&ctx->update_secret, NULL, update_secret, (void *)mod)) {
+		knotd_mod_log(mod, LOG_DEBUG, "Failed to create the secret rollover thread.\n");
+	};
 
 	// Initialize BADCOOKIE counter
 	ctx->badcookie_ctr = 0;
@@ -216,7 +240,6 @@ int cookies_load(knotd_mod_t *mod)
 void cookies_unload(knotd_mod_t *mod)
 {
 	cookies_ctx_t *ctx = knotd_mod_ctx(mod);
-	free(ctx->server_secret);
 	free(ctx);
 }
 
