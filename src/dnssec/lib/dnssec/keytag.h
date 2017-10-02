@@ -16,11 +16,9 @@
 /*!
  * \file
  *
- * Low-level key tag computation API.
- *
  * \defgroup keytag Key tag
  *
- * Low-level key tag computation API.
+ * \brief Low-level key tag computation API.
  *
  * The module provides simple interface for DNSKEY key id computation.
  *

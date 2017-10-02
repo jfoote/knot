@@ -16,9 +16,7 @@
 /*!
  * \file
  *
- * DNSSEC generic lists.
- *
- * \defgroup list Lists
+ * \defgroup list Generic lists
  *
  * @{
  */

@@ -16,11 +16,9 @@
 /*!
  * \file
  *
- * DNSSEC key ID manipulation.
- *
  * \defgroup keyid Key ID
- *
- * DNSSEC key ID manipulation.
+ * 
+ * \brief DNSSEC key ID manipulation.
  *
  * The module contains auxiliary functions for manipulation with key IDs.
  *

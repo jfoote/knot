@@ -16,11 +16,9 @@
 /*!
  * \file
  *
- * NSEC bitmap and NSEC3 hash computation API.
+ * \defgroup nsec NSEC and NSEC3
  *
- * \defgroup nsec NSEC
- *
- * NSEC bitmap and NSEC3 hash computation API.
+ * \brief NSEC bitmap and NSEC3 hash computation API.
  *
  * The module provides interface for computation of NSEC3 hashes and for
  * construction of bit maps used in NSEC and NSEC3 records.

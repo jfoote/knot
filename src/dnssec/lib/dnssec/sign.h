@@ -16,11 +16,7 @@
 /*!
  * \file
  *
- * DNSSEC signing API.
- *
- * \defgroup sign Sign
- *
- * DNSSEC signing API.
+ * \defgroup sign DNSSEC signing API
  *
  * The module provides the low level DNSSEC signing and verification.
  *

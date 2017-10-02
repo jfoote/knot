@@ -16,11 +16,9 @@
 /*!
  * \file
  *
- * Universal binary data container.
- *
  * \defgroup binary Binary
  *
- * Universal binary data container.
+ * \brief Universal binary data container.
  *
  * The module provides universal binary data container extensively used by
  * a lot of functions provided by the library.

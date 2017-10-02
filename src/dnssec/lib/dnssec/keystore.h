@@ -16,11 +16,9 @@
 /*!
  * \file
  *
- * Private key store access.
+ * \defgroup keystore Keystore
  *
- * \defgroup keystore Key store
- *
- * Private key store access.
+ * \brief Private key store access.
  *
  * The module provides abstraction for private key store. Basically, PKCS #8
  * and PKCS #11 interfaces are supported.

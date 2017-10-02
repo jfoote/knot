@@ -16,11 +16,9 @@
 /*!
  * \file
  *
- * Pseudo-random number generating API.
- *
  * \defgroup random Random
  *
- * Pseudo-random number generating API.
+ * \brief Pseudo-random number generating API.
  *
  * The module provides generating of pseudo-random numbers and buffers.
  *

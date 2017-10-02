@@ -16,11 +16,9 @@
 /*!
  * \file
  *
- * Low-level TSIG signing API.
- *
  * \defgroup tsig TSIG
  *
- * Low-level TSIG signing API.
+ * \brief Low-level TSIG signing API.
  *
  * Example:
  *

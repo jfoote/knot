@@ -16,11 +16,9 @@
 /*!
  * \file
  *
- * Cryptographic backend initialization.
- *
  * \defgroup crypto Crypto
  *
- * Cryptographic backend initialization.
+ * \brief Cryptographic backend initialization.
  *
  * For most cryptographic operations, the library requires global
  * initialization. Also, if the application creates a subprocess, the
