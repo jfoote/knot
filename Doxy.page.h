@@ -1,15 +1,5 @@
 /*!
 
-\defgroup server            Server module
-\defgroup threading         Threading API
-\defgroup config            Server configuration
-\defgroup query_processing  DNS query processing
-\defgroup logging           Server logging API
-\defgroup ctl               Control module
-\defgroup zone_scanner      Zone scanner (core)
-\defgroup zone_scanner_test Zone scanner testing environment
-\defgroup knot_utils        DNS utilities
-
 \mainpage Knot API documentation.
 
 \par Knot DNS libraries
@@ -39,8 +29,22 @@ https://gitlab.labs.nic.cz/knot/knot-dns/issues
 
 \page libknot-page libknot - DNS-related functions
 
-\ref libknot
+description
 
+\section libknot-content Knot's library modules
+
+ - \ref libknot
+ - \ref rr - \copybrief rr
+ - \ref rrtype
+ - \ref knot-tsig - \copybrief knot-tsig
+ - \ref dname - \copybrief dname
+ - \ref knot-binary - \copybrief knot-binary
+ - \ref yparser - \copybrief yparser
+ - \ref ctl - \copybrief ctl
+ - \ref cookies - \copybrief cookies
+ - \ref db
+ - \ref pkt - \copybrief pkt
+ - \ref wire - \copybrief wire
 
 \page libdnssec-page libdnssec - DNSSEC library used by Knot DNS
 
@@ -115,6 +119,11 @@ This is the API documentation for the \c libdnssec library.
 
 \page libzscanner-page libzscanner - Zone scanner tool
 
-\ref libknot
+Decription
+
+\section libzscanner-content Zone scanner library modules
+
+ - \ref zone_scanner
+ - \ref zone_scanner_test
 
  */

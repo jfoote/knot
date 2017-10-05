@@ -1,4 +1,4 @@
-/*  Copyright (C) 2016 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -19,6 +19,19 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+/*!
+ * \file
+ *
+ * \brief Server cookies.
+ *
+ * \defgroup cookies Knot cookies
+ *
+ * \brief Module handling client and server cookies.
+ *
+ * \addtogroup cookies
+ * @{
+ */
 
 /*!
  * \brief Convenience structure holding both, server and client, cookies.
@@ -133,3 +146,5 @@ struct knot_sc_alg {
 int knot_sc_check(uint16_t nonce_len, const struct knot_dns_cookies *cookies,
                   const struct knot_sc_private *srvr_data,
                   const struct knot_sc_alg *sc_alg);
+
+/*! @} */

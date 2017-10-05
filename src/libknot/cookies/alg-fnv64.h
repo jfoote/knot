@@ -1,4 +1,4 @@
-/*  Copyright (C) 2016 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -12,6 +12,12 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/*!
+ * \file
+ *
+ * \addtogroup cookies
+ * @{
  */
 
 #pragma once
@@ -30,3 +36,5 @@ extern const struct knot_cc_alg knot_cc_alg_fnv64;
  * \note The algorithm expects a nonce value, time stamp and hash value.
  */
 extern const struct knot_sc_alg knot_sc_alg_fnv64;
+
+/*! @} */

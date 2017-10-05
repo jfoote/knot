@@ -14,9 +14,22 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/*!
+ * \file
+ *
+ * \brief Structures for binary data handling.
+ *
+ * \defgroup db Knot database
+ *
+ * \addtogroup db
+ * @{
+ */
+
 #pragma once
 
 #include "libknot/mm_ctx.h"
+
+
 
 enum {
 	/* Database flags */
@@ -79,3 +92,5 @@ typedef struct knot_db_api {
 	int (*iter_val)(knot_db_iter_t *iter, knot_db_val_t *val);
 	void (*iter_finish)(knot_db_iter_t *iter);
 } knot_db_api_t;
+
+/*! @} */

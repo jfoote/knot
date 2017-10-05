@@ -18,7 +18,11 @@
  *
  * \brief Domain name structure and API for manipulating it.
  *
- * \addtogroup libknot
+ * \defgroup dname Domain name
+ * 
+ * \brief Domain name structure and API for manipulating it.
+ * 
+ * \addtogroup dname
  * @{
  */
 

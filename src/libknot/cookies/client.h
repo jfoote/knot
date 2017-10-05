@@ -1,4 +1,4 @@
-/*  Copyright (C) 2016 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -19,6 +19,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+/*!
+ * \file
+ *
+ * \brief Client cookies.
+ *
+ * \addtogroup cookies
+ * @{
+ */
 
 /*!
  * \brief Input data needed to compute the client cookie value.
@@ -75,3 +84,6 @@ struct knot_cc_alg {
 int knot_cc_check(const uint8_t *cc, uint16_t cc_len,
                   const struct knot_cc_input *input,
                   const struct knot_cc_alg *cc_alg);
+
+
+/*! @} */

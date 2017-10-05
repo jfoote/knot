@@ -18,7 +18,7 @@
  *
  * \brief API for manipulating RR arrays.
  *
- * \addtogroup libknot
+ * \addtogroup rr
  * @{
  */
 
@@ -31,7 +31,7 @@
 #include "libknot/mm_ctx.h"
 #include "libknot/rdata.h"
 
-/*!< \brief Set of RRs. */
+/*! \brief Set of RRs. */
 typedef struct knot_rdataset {
 	uint16_t rr_count;  /*!< \brief Count of RRs stored in the structure. */
 	knot_rdata_t *data; /*!< \brief Actual data, canonically sorted. */

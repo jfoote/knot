@@ -19,6 +19,11 @@
 #include "libknot/dname.h"
 #include "dnssec/tsig.h"
 
+/*
+ * \addtogroup knot-tsig
+ * @{
+ */
+
 /*!
  * \brief TSIG key.
  */
@@ -80,3 +85,5 @@ void knot_tsig_key_deinit(knot_tsig_key_t *key);
  * \brief Duplicate a TSIG key.
  */
 int knot_tsig_key_copy(knot_tsig_key_t *dst, const knot_tsig_key_t *src);
+
+/*! @} */

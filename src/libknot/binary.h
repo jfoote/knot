@@ -19,7 +19,11 @@
  *
  * \brief Structures for binary data handling.
  *
- * \addtogroup libknot
+ * \defgroup knot-binary Binary
+ *
+ * \brief Structures for binary data handling.
+ *
+ * \addtogroup knot-binary
  * @{
  */
 

@@ -17,8 +17,12 @@
  * \file
  *
  * \brief TSIG signing and validating.
+ * 
+ * \defgroup knot-tsig Knot's TSIG
+ * 
+ * \brief Knot's TSIG module and operations.
  *
- * \addtogroup libknot
+ * \addtogroup knot-tsig
  * @{
  */
 

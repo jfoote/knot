@@ -1,4 +1,4 @@
-/*  Copyright (C) 2014 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
+/*  Copyright (C) 2017 CZ.NIC, z.s.p.o. <knot-dns@labs.nic.cz>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
  *
  * \brief API for manipulating RRs.
  *
- * \addtogroup libknot
+ * \addtogroup rr
  * @{
  */
 
@@ -30,7 +30,7 @@
 
 /* ---------------------------- Single RR ----------------------------------- */
 
-/*!< \brief Maximum rdata data size. */
+/*! \brief Maximum rdata data size. */
 #define MAX_RDLENGTH 65535
 
 /*!

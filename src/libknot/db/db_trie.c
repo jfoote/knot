@@ -14,6 +14,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+/*
+ * \file
+ *
+ * \addtogroup db
+ * @{
+ */
+
 #include <assert.h>
 
 #include "libknot/attribute.h"
@@ -176,3 +183,5 @@ const knot_db_api_t *knot_db_trie_api(void)
 
 	return &api;
 }
+
+/*! @} */
