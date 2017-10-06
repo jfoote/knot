@@ -18,10 +18,6 @@
  *
  * \brief Simple parser (Yparser) of a YAML-inspired data format.
  *
- * \defgroup yparser Yparser
- *
- * \brief Simple parser (Yparser) of a YAML-inspired data format.
- *
  * \addtogroup yparser
  * @{
  */

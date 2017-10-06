@@ -18,10 +18,6 @@
  *
  * \brief Functions for manipulating and parsing raw data in DNS packets.
  *
- * \defgroup wire Packet wire format
- *
- * \brief Functions for manipulating and parsing raw data in DNS packets.
- *
  * \addtogroup wire
  * @{
  */

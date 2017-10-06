@@ -19,10 +19,6 @@
  *
  * \brief Structures for binary data handling.
  *
- * \defgroup knot-binary Binary
- *
- * \brief Structures for binary data handling.
- *
  * \addtogroup knot-binary
  * @{
  */

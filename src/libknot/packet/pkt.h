@@ -18,10 +18,6 @@
  *
  * \brief Structure for holding DNS packet data and metadata.
  *
- * \defgroup pkt Packet
- *
- * \brief Structure for holding DNS packet data and metadata and conpression.
- *
  * \addtogroup pkt
  * @{
  */

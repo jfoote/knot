@@ -18,12 +18,6 @@
  *
  * \brief RRSet structure and API for manipulating it.
  *
- * \defgroup rr Resource records
- * 
- * \brief Resource records structures and API for manipulation.
- * 
- * Module provides abstraction and manipulation with RR's.
- *
  * \addtogroup rr
  * @{
  */

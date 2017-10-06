@@ -25,10 +25,6 @@
  *
  * \brief Server cookies.
  *
- * \defgroup cookies Knot cookies
- *
- * \brief Module handling client and server cookies.
- *
  * \addtogroup cookies
  * @{
  */

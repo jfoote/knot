@@ -1,4 +1,26 @@
 /*!
+\defgroup rrtype RRTYPE
+\defgroup db Knot database
+\defgroup knot-binary Binary
+    \brief Structures for binary data handling.
+\defgroup ctl Control interface
+    \brief A server control interface.
+\defgroup cookies Knot cookies
+    \brief Module handling client and server cookies.
+\defgroup dname Domain name
+    \brief Domain name structure and API for manipulating it.
+\defgroup pkt Packet
+    \brief Structure for holding DNS packet data and metadata and conpression.
+\defgroup wire Packet wire format
+    \brief Functions for manipulating and parsing raw data in DNS packets.
+\defgroup knot-tsig Knot's TSIG
+    \brief Knot's TSIG module and operations.
+\defgroup yparser Yparser
+    \brief Simple parser (Yparser) of a YAML-inspired data format.
+\defgroup rr Resource records
+    \brief Resource records structures and API for manipulation.
+
+    Module provides abstraction and manipulation with RR's.
 
 \mainpage Knot API documentation.
 

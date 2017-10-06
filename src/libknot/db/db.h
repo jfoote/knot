@@ -19,8 +19,6 @@
  *
  * \brief Structures for binary data handling.
  *
- * \defgroup db Knot database
- *
  * \addtogroup db
  * @{
  */

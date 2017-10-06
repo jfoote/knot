@@ -18,10 +18,6 @@
  *
  * \brief Domain name structure and API for manipulating it.
  *
- * \defgroup dname Domain name
- * 
- * \brief Domain name structure and API for manipulating it.
- * 
  * \addtogroup dname
  * @{
  */

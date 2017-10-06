@@ -18,10 +18,6 @@
  *
  * \brief A server control interface.
  *
- * \defgroup ctl Control interface
- *
- * \brief A server control interface.
- *
  * \addtogroup ctl
  * @{
  */

@@ -16,8 +16,6 @@
 /*!
  * \file
  *
- * \defgroup rrtype RRTYPE
- *
  * \addtogroup rrtype
  * @{
  */
