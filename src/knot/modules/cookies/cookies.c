@@ -30,7 +30,7 @@
 #define COOKIES_CC_LEN KNOT_OPT_COOKIE_CLNT
 #define COOKIES_NONCE_LEN 8
 #define COOKIES_HASH_LEN 8
-#define COOKIES_BADCOOKIE_DROP_RATE 1
+#define COOKIES_BADCOOKIE_DROP_RATE 4
 #define COOKIES_REFRESH_TIME 26*60 // 26 hours
 
 typedef struct knot_sc_private knot_sc_private_t;

@@ -106,8 +106,18 @@ static knotd_state_t ratelimit_apply(knotd_state_t state, knot_pkt_t *pkt,
 
 	rrl_ctx_t *ctx = knotd_mod_ctx(mod);
 
+	// If the packet is to be dropped, finish.
+	if (state == KNOTD_STATE_NOOP) {
+		return state;
+	}
+
 	// Rate limit is not applied to TCP connections.
 	if (!(qdata->params->flags & KNOTD_QUERY_FLAG_LIMIT_SIZE)) {
+		return state;
+	}
+
+	// Rate limit is not applied to responses with a COOKIE OPT.
+	if (pkt->opt_rr && knot_edns_has_option(pkt->opt_rr, KNOT_EDNS_OPTION_COOKIE)) {
 		return state;
 	}
 
