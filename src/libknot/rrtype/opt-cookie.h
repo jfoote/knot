@@ -22,6 +22,7 @@
 #define KNOT_OPT_COOKIE_CLNT KNOT_OPT_COOKIE_MIN
 #define KNOT_OPT_COOKIE_SRVR_MIN 8
 #define KNOT_OPT_COOKIE_SRVR_MAX 32
+#define KNOT_OPT_COOKIE_MAX 48 // KNOT_OPT_COOKIE_CLNT + KNOT_OPT_COOKIE_SRVR_MAX
 
 /*!
  * \brief Returns the size of the buffer required to store the cookie.

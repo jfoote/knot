@@ -260,6 +260,13 @@ static void print_section_opt(const knot_pkt_t *packet)
 		case KNOT_EDNS_OPTION_PADDING:
 			printf(";; PADDING: %u B\n", opt_len);
 			break;
+		case KNOT_EDNS_OPTION_COOKIE:
+			printf(";; COOKIE: ");
+			for (uint16_t i = 0; i < opt_len; i++) {
+				printf("%02x", opt_data[i]);
+			}
+			printf("\n");
+			break;
 		default:
 			printf(";; Option (%u): ", opt_code);
 			short_hex_print(opt_data, opt_len);

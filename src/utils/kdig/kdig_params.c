@@ -22,6 +22,7 @@
 
 #include "utils/kdig/kdig_params.h"
 #include "utils/common/cert.h"
+#include "utils/common/hex.h"
 #include "utils/common/msg.h"
 #include "utils/common/params.h"
 #include "utils/common/resolv.h"
@@ -31,6 +32,7 @@
 #include "contrib/sockaddr.h"
 #include "contrib/strtonum.h"
 #include "contrib/ucw/lists.h"
+#include "dnssec/lib/dnssec/random.h"
 
 #define PROGRAM_NAME "kdig"
 
@@ -872,6 +874,89 @@ static int opt_nosubnet(const char *arg, void *query)
 	return KNOT_EOK;
 }
 
+static int opt_cookie(const char *arg, void *query)
+{
+	query_t *q = query;
+	if (q->cookie == NULL) {
+		q->cookie = calloc(1, sizeof(knot_dns_cookies_t));
+		if (q->cookie == NULL) {
+			return KNOT_ENOMEM;
+		}
+	}
+
+	if (arg != NULL) {
+
+		uint8_t* input = NULL;
+		size_t input_len;
+
+		int ret = hex_decode(arg, &input, &input_len);
+		if (ret != KNOT_EOK) {
+			free(input);
+			return ret;
+		}
+
+		if (input_len < KNOT_OPT_COOKIE_CLNT) {
+			ERR("+cookie=%s is too short", arg);
+			return KNOT_EINVAL;
+		}
+		if (input_len > KNOT_OPT_COOKIE_MAX) {
+			ERR("+cookie=%s is too long", arg);
+			return KNOT_EINVAL;
+		}
+
+		q->cookie->cc_len = KNOT_OPT_COOKIE_CLNT;
+		q->cookie->cc = malloc(q->cookie->cc_len);
+		if (q->cookie->cc == NULL) {
+			return KNOT_ENOMEM;
+		}
+		memcpy((uint8_t *)q->cookie->cc, input, q->cookie->cc_len);
+
+		q->cookie->sc_len = input_len - KNOT_OPT_COOKIE_CLNT;
+		q->cookie->sc = malloc(q->cookie->sc_len);
+		if (q->cookie->cc == NULL) {
+			return KNOT_ENOMEM;
+		}
+		memcpy((uint8_t *)q->cookie->sc, input + q->cookie->cc_len, q->cookie->sc_len);
+
+		free(input);
+	} else {
+
+		q->cookie->cc_len = KNOT_OPT_COOKIE_CLNT;
+		q->cookie->cc = malloc(q->cookie->cc_len);
+		if (q->cookie->cc == NULL) {
+			return KNOT_ENOMEM;
+		}
+
+		int ret = dnssec_random_buffer((uint8_t *)q->cookie->cc, q->cookie->cc_len);
+		if (ret != KNOT_EOK) {
+			return knot_error_from_libdnssec(ret);
+		}
+	}
+	return KNOT_EOK;
+}
+
+static int opt_nocookie(const char *arg, void *query)
+{
+	query_t *q = query;
+	if (q->cookie != NULL) {
+		free((void *)q->cookie->cc);
+		free((void *)q->cookie->sc);
+		free(q->cookie);
+	}
+	q->cookie = NULL;
+	return KNOT_EOK;
+}
+
+static int opt_badcookie(const char *arg, void *query)
+{
+	return KNOT_EOK;
+}
+
+static int opt_nobadcookie(const char *arg, void *query)
+{
+	return KNOT_EOK;
+}
+
 static int opt_edns(const char *arg, void *query)
 {
 	query_t *q = query;
@@ -902,6 +987,7 @@ static int opt_noedns(const char *arg, void *query)
 	opt_nopadding(arg, query);
 	opt_noalignment(arg, query);
 	opt_nosubnet(arg, query);
+	opt_nocookie(arg, query);
 
 	return KNOT_EOK;
 }
@@ -1083,6 +1169,12 @@ static const param_t kdig_opts2[] = {
 	{ "retry",          ARG_REQUIRED, opt_retry },
 	{ "noretry",        ARG_NONE,     opt_noretry },
 
+	{ "cookie",         ARG_OPTIONAL, opt_cookie },
+	{ "nocookie",       ARG_NONE,     opt_nocookie },
+
+	{ "badcookie",      ARG_NONE,     opt_badcookie },
+	{ "nobadcookie",    ARG_NONE,     opt_nobadcookie },
+
 	/* "idn" doesn't work since it must be called before query creation. */
 	{ "noidn",          ARG_NONE,     opt_noidn },
 
@@ -1247,6 +1339,7 @@ void query_free(query_t *query)
 	free(query->owner);
 	free(query->port);
 	free(query->subnet);
+	opt_nocookie(NULL, query);
 	free(query);
 }
 

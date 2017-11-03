@@ -284,6 +284,31 @@ static int add_query_edns(knot_pkt_t *packet, const query_t *query, uint16_t max
 		}
 	}
 
+	/* Append a cookie option if present. */
+	if (query->cookie != NULL) {
+
+		uint8_t *wire_ptr = NULL;
+		uint16_t size = knot_edns_opt_cookie_data_len(query->cookie->cc_len,
+		                                              query->cookie->sc_len);
+
+		ret = knot_edns_reserve_option(&opt_rr, KNOT_EDNS_OPTION_COOKIE,
+		                               size, &wire_ptr, &packet->mm);
+		if (ret != KNOT_EOK) {
+			knot_rrset_clear(&opt_rr, &packet->mm);
+			return ret;
+		}
+
+		ret = knot_edns_opt_cookie_write(query->cookie->cc,
+		                                 query->cookie->cc_len,
+		                                 query->cookie->sc,
+		                                 query->cookie->sc_len,
+		                                 wire_ptr, size);
+		if (ret != size) {
+			knot_rrset_clear(&opt_rr, &packet->mm);
+			return KNOT_EINVAL;
+		}
+	}
+
 	/* Append EDNS Padding. */
 	int padding = query->padding;
 	if (padding != -3 && query->alignment > 0) {
@@ -325,7 +350,7 @@ static bool do_padding(const query_t *query)
 static bool use_edns(const query_t *query)
 {
 	return query->edns > -1 || query->udp_size > -1 || query->nsid ||
-	       query->flags.do_flag || query->subnet != NULL ||
+	       query->flags.do_flag || query->subnet != NULL || query->cookie != NULL ||
 	       do_padding(query);
 }
 

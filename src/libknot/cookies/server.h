@@ -25,12 +25,12 @@
 /*!
  * \brief Convenience structure holding both, server and client, cookies.
  */
-struct knot_dns_cookies {
+typedef struct knot_dns_cookies {
 	const uint8_t *cc; /*!< Client cookie. */
 	uint16_t cc_len;   /*!< Client cookie size. */
 	const uint8_t *sc; /*!< Server cookie. */
 	uint16_t sc_len;   /*!< Server cookie size. */
-};
+} knot_dns_cookies_t;
 
 /*!
  * \brief Private data known to the server.
