@@ -27,7 +27,7 @@
 #define SERVER_HASH_LEN 8
 
 _public_
-bool knot_sc_input_is_valid(const struct knot_sc_input *input)
+bool knot_sc_input_is_valid(const knot_sc_input_t *input)
 {
 	/*
 	 * RFC7873 4.2 -- Server cookie should be generated from request
@@ -39,7 +39,7 @@ bool knot_sc_input_is_valid(const struct knot_sc_input *input)
 
 _public_
 int knot_sc_parse(uint16_t nonce_len, const uint8_t *sc, uint16_t sc_len,
-                  struct knot_sc_content *content)
+                  knot_sc_content_t *content)
 {
 	if (!sc || !sc_len || !content) {
 		return KNOT_EINVAL;
@@ -58,7 +58,8 @@ int knot_sc_parse(uint16_t nonce_len, const uint8_t *sc, uint16_t sc_len,
 	return KNOT_EOK;
 }
 
-static uint64_t generate_server_cookie(const struct knot_sc_input *input)
+_public_
+uint64_t generate_server_cookie(const knot_sc_input_t *input)
 {
 	SIPHASH_CTX ctx;
 	SipHash24_Init(&ctx, &input->srvr_data->secret);
@@ -83,8 +84,8 @@ static uint64_t generate_server_cookie(const struct knot_sc_input *input)
 }
 
 _public_
-int knot_sc_check(uint16_t nonce_len, const struct knot_dns_cookies *cookies,
-                  const struct knot_sc_private *srvr_data)
+int knot_sc_check(uint16_t nonce_len, const knot_dns_cookies_t *cookies,
+                  const knot_sc_private_t *srvr_data)
 {
 	if (!cookies || !srvr_data) {
 		return KNOT_EINVAL;
@@ -107,7 +108,7 @@ int knot_sc_check(uint16_t nonce_len, const struct knot_dns_cookies *cookies,
 		return KNOT_EINVAL;
 	}
 
-	struct knot_sc_content content = { 0 };
+	knot_sc_content_t content = { 0 };
 
 	/* Obtain data from received server cookie. */
 	int ret = knot_sc_parse(nonce_len, cookies->sc, cookies->sc_len, &content);
@@ -119,7 +120,7 @@ int knot_sc_check(uint16_t nonce_len, const struct knot_dns_cookies *cookies,
 		return KNOT_EINVAL;
 	}
 
-	struct knot_sc_input sc_input = {
+	knot_sc_input_t sc_input = {
 		.cc = cookies->cc,
 		.cc_len = cookies->cc_len,
 		.nonce = content.nonce,

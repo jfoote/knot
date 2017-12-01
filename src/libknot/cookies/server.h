@@ -38,35 +38,35 @@ typedef struct knot_dns_cookies {
  * \note Contains data needed to check the inbound server cookie and to
  *       generate a new one.
  */
-struct knot_sc_private {
+typedef struct knot_sc_private {
 	const struct sockaddr *clnt_sockaddr; /*!< Client (remote) socket address. */
 	SIPHASH_KEY secret; /*!< Server secret data. */
-};
+} knot_sc_private_t;
 
 /*!
  * \brief Inbound server cookie content structure.
  *
  * \note These data are obtained from an incoming server cookie.
  */
-struct knot_sc_content {
+typedef struct knot_sc_content {
 	const uint8_t *nonce; /*!< Some value prefixed to the hash. */
 	uint16_t nonce_len;   /*!< Nonce data length. */
 	const uint8_t *hash;  /*!< Hash data. */
 	uint16_t hash_len;    /*!< Hash data length. */
-};
+} knot_sc_content_t;
 
 /*!
  * \brief Input data needed to compute the server cookie value.
  *
  * \note All these data are needed to generate a new server cookie hash.
  */
-struct knot_sc_input {
+typedef struct knot_sc_input {
 	const uint8_t *cc;    /*!< Client cookie. */
 	uint16_t cc_len;      /*!< Client cookie size. */
 	const uint8_t *nonce; /*!< Some value prefixed before the hash. */
 	uint16_t nonce_len;   /*!< Nonce data length. */
-	const struct knot_sc_private *srvr_data; /*!< Private data known to the server. */
-};
+	const knot_sc_private_t *srvr_data; /*!< Private data known to the server. */
+} knot_sc_input_t;
 
 /*!
  * \brief Check server cookie input data for basic sanity.
@@ -76,7 +76,7 @@ struct knot_sc_input {
  * \retval true if input contains client cookie and server secret data
  * \retval false if input is insufficient or NULL pointer passed
  */
-bool knot_sc_input_is_valid(const struct knot_sc_input *input);
+bool knot_sc_input_is_valid(const knot_sc_input_t *input);
 
 /*!
  * \brief Reads a server cookie that contains \a nonce_len bytes of data
@@ -93,32 +93,10 @@ bool knot_sc_input_is_valid(const struct knot_sc_input *input);
  * \retval KNOT_EINVAL
  */
 int knot_sc_parse(uint16_t nonce_len, const uint8_t *sc, uint16_t sc_len,
-                  struct knot_sc_content *content);
+                  knot_sc_content_t *content);
 
-/*!
- * \brief Hash generator function type.
- *
- * \note The function writes only the hash value. It does not write any nonce
- *       data prefixed before the actual hash value. Nonce data must be written
- *       by an external function into the server cookie.
- *
- * \param input     Data which to generate the cookie from.
- * \param hash_out  Buffer to write the resulting hash data into.
- * \param hash_len  Hash buffer size.
- *
- * \retval non-zero size of written data on successful return
- * \retval 0 on error
- */
-typedef uint16_t (knot_sc_hash_t)(const struct knot_sc_input *input,
-                                  uint8_t *hash_out, uint16_t hash_len);
 
-/*!
- * \brief Holds description of the server cookie algorithm.
- */
-struct knot_sc_alg {
-	const uint16_t hash_size;  /*!< Hash size the algorithm operates with. */
-	knot_sc_hash_t *hash_func; /*!< Cookie generator function. */
-};
+uint64_t generate_server_cookie(const knot_sc_input_t *input);
 
 /*!
  * \brief Check whether supplied client and server cookies match.
@@ -130,5 +108,5 @@ struct knot_sc_alg {
  * \retval KNOT_EOK
  * \retval KNOT_EINVAL
  */
-int knot_sc_check(uint16_t nonce_len, const struct knot_dns_cookies *cookies,
-                  const struct knot_sc_private *srvr_data);
+int knot_sc_check(uint16_t nonce_len, const knot_dns_cookies_t *cookies,
+                  const knot_sc_private_t *srvr_data);
