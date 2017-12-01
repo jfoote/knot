@@ -20,9 +20,9 @@
 #include "knot/include/module.h"
 #include "knot/nameserver/process_query.h"
 #include "libknot/cookies/server.h"
-#include "libknot/cookies/alg-fnv64.h"
 #include "libknot/rrtype/opt-cookie.h"
 #include "contrib/time.h"
+#include "contrib/openbsd/siphash.h"
 #include "dnssec/lib/dnssec/random.h"
 
 #define COOKIES_SECRET_LEN 8
@@ -35,12 +35,12 @@
 #define MOD_BADCOOKIE_SLIP  "\x0E""badcookie-slip"
 
 #ifdef HAVE_ATOMIC
-#define ATOMIC_SET(dst, val) __atomic_store_n(&(dst), (val), __ATOMIC_RELAXED)
-#define ATOMIC_GET(src) __atomic_load_n(&(src), __ATOMIC_RELAXED)
+#define ATOMIC_SET(dst, val) __atomic_store(&(dst), &(val), __ATOMIC_RELAXED)
+#define ATOMIC_GET(src, dst) __atomic_load(&(src), &(dst), __ATOMIC_RELAXED)
 #define ATOMIC_ADD(dst, val) __atomic_add_fetch(&(dst), (val), __ATOMIC_RELAXED)
 #else
 #define ATOMIC_SET(dst, val) ((dst) = (val))
-#define ATOMIC_GET(src) (src)
+#define ATOMIC_GET(src, dst) ((dst) = (src))
 #define ATOMIC_ADD(dst, val) ((dst) += (val))
 #endif
 
@@ -55,7 +55,7 @@ typedef struct knot_sc_alg knot_sc_alg_t;
 typedef struct knot_sc_input knot_sc_input_t;
 
 typedef struct {
-	uint64_t server_secret;
+	SIPHASH_KEY server_secret;
 	uint16_t badcookie_ctr; // Counter for BADCOOKIE answers
 	pthread_t update_secret;
 	uint32_t secret_lifetime;
@@ -68,7 +68,8 @@ static void update_ctr(cookies_ctx_t *ctx)
 
 	ATOMIC_ADD(ctx->badcookie_ctr, 1);
 	if (ctx->badcookie_ctr == ctx->badcookie_slip) {
-		ATOMIC_SET(ctx->badcookie_ctr, 0);
+		uint16_t zero = 0;
+		ATOMIC_SET(ctx->badcookie_ctr, zero);
 	}
 }
 
@@ -77,13 +78,18 @@ static int generate_secret(cookies_ctx_t *ctx)
 	assert(ctx);
 
 	// Generate a new secret and store it atomically
-	uint64_t new_secret;
-	int ret = dnssec_random_buffer((uint8_t *)&new_secret, COOKIES_SECRET_LEN);
-	ATOMIC_SET(ctx->server_secret, new_secret);
-
+	SIPHASH_KEY new_secret;
+	int ret = dnssec_random_buffer((uint8_t *)&new_secret.k0, COOKIES_SECRET_LEN);
 	if (ret != KNOT_EOK) {
 		return ret;
 	}
+	ret = dnssec_random_buffer((uint8_t *)&new_secret.k1, COOKIES_SECRET_LEN);
+	if (ret != KNOT_EOK) {
+		return ret;
+	}
+
+	__atomic_load(&ctx->server_secret, &new_secret, __ATOMIC_RELAXED);
+	//ATOMIC_SET(ctx->server_secret, new_secret);
 
 	return KNOT_EOK;
 }
@@ -136,11 +142,8 @@ static int put_cookie(cookies_ctx_t *ctx, knotd_qdata_t *qdata, knot_pkt_t *pkt,
 	};
 
 	// Second 8 bytes are the hash
-	uint16_t hash_len = knot_sc_alg_fnv64.hash_func(&sc_input, sc + COOKIES_NONCE_LEN,
-	                                                COOKIES_HASH_LEN);
-	if (hash_len != COOKIES_HASH_LEN) {
-		return KNOT_EINVAL;
-	}
+	uint64_t hash = generate_server_cookie(&sc_input);
+	memcpy(sc + COOKIES_NONCE_LEN, &hash, COOKIES_HASH_LEN);
 
 	// Write the prepared cookie to the wire
 	ret = knot_edns_opt_cookie_write(cc, COOKIES_CC_LEN, sc, COOKIES_SC_LEN,
@@ -187,11 +190,11 @@ static knotd_state_t cookies_process(knotd_state_t state, knot_pkt_t *pkt,
 	}
 
 	// Prepare data for server cookie computation
-	uint64_t current_secret = ATOMIC_GET(ctx->server_secret);
+	SIPHASH_KEY new_secret = { 0 };
+	ATOMIC_GET(ctx->server_secret, new_secret);
 	knot_sc_private_t srvr_data = {
 		.clnt_sockaddr = (struct sockaddr *)qdata->params->remote,
-		.secret_data = (uint8_t *)&current_secret,
-		.secret_len = COOKIES_SECRET_LEN
+		.secret = new_secret
 	};
 
 	// If this is a TCP connection, just answer with the current server cookie
@@ -205,7 +208,7 @@ static knotd_state_t cookies_process(knotd_state_t state, knot_pkt_t *pkt,
 	}
 
 	// Compare server cookies
-	ret = knot_sc_check(COOKIES_NONCE_LEN, &cookies, &srvr_data, &knot_sc_alg_fnv64);
+	ret = knot_sc_check(COOKIES_NONCE_LEN, &cookies, &srvr_data);
 
 	if (ret == KNOT_EOK) {
 		ret = put_cookie(ctx, qdata, pkt, cookies.cc, &srvr_data);
