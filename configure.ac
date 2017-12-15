@@ -579,7 +579,6 @@ result_msg_base="  $PACKAGE $VERSION
     Ed25519 support:        ${enable_ed25519}
     Code coverage:          ${enable_code_coverage}
     Sanitizer:              ${with_sanitize}
-    Sanitizer coverage:     ${with_sanitize_coverage}
     LibFuzzer:              ${with_sanitize_fuzzer}
 "
 
