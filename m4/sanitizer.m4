@@ -31,6 +31,7 @@ AC_DEFUN([AX_SANITIZER], [
   )
   AC_ARG_WITH([sanitize-fuzzer],
     [AS_HELP_STRING([--with-sanitize-fuzzer], [Compile with sanitizer fuzzer (require clang >= 6.0) [default=no]])],
+    [],
     [with_sanitize_fuzzer=no]
   )
 
