@@ -22,6 +22,7 @@
 
 #include "utils/kdig/kdig_params.h"
 #include "utils/common/cert.h"
+#include "utils/common/hex.h"
 #include "utils/common/msg.h"
 #include "utils/common/params.h"
 #include "utils/common/resolv.h"
@@ -31,6 +32,8 @@
 #include "contrib/sockaddr.h"
 #include "contrib/strtonum.h"
 #include "contrib/ucw/lists.h"
+#include "dnssec/lib/dnssec/error.h"
+#include "dnssec/lib/dnssec/random.h"
 
 #define PROGRAM_NAME "kdig"
 
@@ -743,6 +746,79 @@ static int opt_nobufsize(const char *arg, void *query)
 	return KNOT_EOK;
 }
 
+static int opt_cookie(const char *arg, void *query)
+{
+	query_t *q = query;
+
+	if (arg != NULL) {
+		uint8_t *input = NULL;
+		size_t input_len;
+
+		int ret = hex_decode(arg, &input, &input_len);
+		if (ret != KNOT_EOK) {
+			ERR("invalid +cookie=%s\n", arg);
+			return KNOT_EINVAL;
+		}
+
+		if (input_len < KNOT_EDNS_COOKIE_CLNT_SIZE) {
+			ERR("too short client +cookie=%s\n", arg);
+			free(input);
+			return KNOT_EINVAL;
+		}
+		q->cc.len = KNOT_EDNS_COOKIE_CLNT_SIZE;
+		memcpy(q->cc.data, input, q->cc.len);
+
+		input_len -= q->cc.len;
+		if (input_len > 0) {
+			if (input_len < KNOT_EDNS_COOKIE_SRVR_MIN_SIZE) {
+				ERR("too short server +cookie=%s\n", arg);
+				free(input);
+				return KNOT_EINVAL;
+			}
+			if (input_len > KNOT_EDNS_COOKIE_SRVR_MAX_SIZE) {
+				ERR("too long server +cookie=%s\n", arg);
+				free(input);
+				return KNOT_EINVAL;
+			}
+			q->sc.len = input_len;
+			memcpy(q->sc.data, input + q->cc.len, q->sc.len);
+		}
+
+		free(input);
+	} else {
+		q->cc.len = KNOT_EDNS_COOKIE_CLNT_SIZE;
+
+		int ret = dnssec_random_buffer(q->cc.data, q->cc.len);
+		if (ret != DNSSEC_EOK) {
+			return knot_error_from_libdnssec(ret);
+		}
+	}
+
+	return KNOT_EOK;
+}
+
+static int opt_nocookie(const char *arg, void *query)
+{
+	query_t *q = query;
+	q->cc.len = 0;
+	q->sc.len = 0;
+	return KNOT_EOK;
+}
+
+static int opt_badcookie(const char *arg, void *query)
+{
+	query_t *q = query;
+	q->badcookie = true;
+	return KNOT_EOK;
+}
+
+static int opt_nobadcookie(const char *arg, void *query)
+{
+	query_t *q = query;
+	q->badcookie = false;
+	return KNOT_EOK;
+}
+
 static int opt_padding(const char *arg, void *query)
 {
 	query_t *q = query;
@@ -808,11 +884,6 @@ static int opt_subnet(const char *arg, void *query)
 	const char   *arg_end = arg + arg_len;
 	size_t       addr_len = 0;
 
-	knot_edns_client_subnet_t *subnet = calloc(1, sizeof(*subnet));
-	if (subnet == NULL) {
-		return KNOT_ENOMEM;
-	}
-
 	// Separate address and network mask.
 	if ((sep = strchr(arg, '/')) != NULL) {
 		addr_len = sep - arg;
@@ -829,7 +900,6 @@ static int opt_subnet(const char *arg, void *query)
 	char *addr_str = strndup(arg, addr_len);
 	if (getaddrinfo(addr_str, NULL, &hints, &ai) != 0) {
 		free(addr_str);
-		free(subnet);
 		ERR("invalid address +subnet=%s\n", arg);
 		return KNOT_EINVAL;
 	}
@@ -838,8 +908,7 @@ static int opt_subnet(const char *arg, void *query)
 	freeaddrinfo(ai);
 	free(addr_str);
 
-	if (knot_edns_client_subnet_set_addr(subnet, &ss) != KNOT_EOK) {
-		free(subnet);
+	if (knot_edns_client_subnet_set_addr(&q->subnet, &ss) != KNOT_EOK) {
 		ERR("invalid address +subnet=%s\n", arg);
 		return KNOT_EINVAL;
 	}
@@ -849,16 +918,12 @@ static int opt_subnet(const char *arg, void *query)
 	if (mask + addr_len < arg_end) {
 		mask += addr_len + 1;
 		uint8_t num = 0;
-		if (str_to_u8(mask, &num) != KNOT_EOK || num > subnet->source_len) {
-			free(subnet);
+		if (str_to_u8(mask, &num) != KNOT_EOK || num > q->subnet.source_len) {
 			ERR("invalid network mask +subnet=%s\n", arg);
 			return KNOT_EINVAL;
 		}
-		subnet->source_len = num;
+		q->subnet.source_len = num;
 	}
-
-	free(q->subnet);
-	q->subnet = subnet;
 
 	return KNOT_EOK;
 }
@@ -867,8 +932,7 @@ static int opt_nosubnet(const char *arg, void *query)
 {
 	query_t *q = query;
 
-	free(q->subnet);
-	q->subnet = NULL;
+	q->subnet.family = AF_UNSPEC;
 
 	return KNOT_EOK;
 }
@@ -900,6 +964,7 @@ static int opt_noedns(const char *arg, void *query)
 	opt_nodoflag(arg, query);
 	opt_nonsid(arg, query);
 	opt_nobufsize(arg, query);
+	opt_nocookie(arg, query);
 	opt_nopadding(arg, query);
 	opt_noalignment(arg, query);
 	opt_nosubnet(arg, query);
@@ -1084,6 +1149,12 @@ static const param_t kdig_opts2[] = {
 	{ "retry",          ARG_REQUIRED, opt_retry },
 	{ "noretry",        ARG_NONE,     opt_noretry },
 
+	{ "cookie",         ARG_OPTIONAL, opt_cookie },
+	{ "nocookie",       ARG_NONE,     opt_nocookie },
+
+	{ "badcookie",      ARG_NONE,     opt_badcookie },
+	{ "nobadcookie",    ARG_NONE,     opt_nobadcookie },
+
 	/* "idn" doesn't work since it must be called before query creation. */
 	{ "noidn",          ARG_NONE,     opt_noidn },
 
@@ -1099,17 +1170,6 @@ query_t *query_create(const char *owner, const query_t *conf)
 		DBG_NULL;
 		return NULL;
 	}
-
-	// Set the query owner if any.
-	if (owner != NULL) {
-		if ((query->owner = strdup(owner)) == NULL) {
-			query_free(query);
-			return NULL;
-		}
-	}
-
-	// Initialize list of servers.
-	init_list(&query->servers);
 
 	// Initialization with defaults or with reference query.
 	if (conf == NULL) {
@@ -1133,16 +1193,20 @@ query_t *query_create(const char *owner, const query_t *conf)
 		query->idn = true;
 		query->nsid = false;
 		query->edns = -1;
+		query->cc.len = 0;
+		query->sc.len = 0;
+		query->badcookie = true;
 		query->padding = -1;
 		query->alignment = 0;
 		tls_params_init(&query->tls);
 		//query->tsig_key
-		query->subnet = NULL;
+		query->subnet.family = AF_UNSPEC;
 #if USE_DNSTAP
 		query->dt_reader = NULL;
 		query->dt_writer = NULL;
 #endif // USE_DNSTAP
 	} else {
+		*query = *conf;
 		query->conf = conf;
 		if (conf->local != NULL) {
 			query->local = srv_info_create(conf->local->name,
@@ -1154,26 +1218,7 @@ query_t *query_create(const char *owner, const query_t *conf)
 		} else {
 			query->local = NULL;
 		}
-		query->operation = conf->operation;
-		query->ip = conf->ip;
-		query->protocol = conf->protocol;
-		query->fastopen = conf->fastopen;
 		query->port = strdup(conf->port);
-		query->udp_size = conf->udp_size;
-		query->retries = conf->retries;
-		query->wait = conf->wait;
-		query->ignore_tc = conf->ignore_tc;
-		query->class_num = conf->class_num;
-		query->type_num = conf->type_num;
-		query->serial = conf->serial;
-		query->notify = conf->notify;
-		query->flags = conf->flags;
-		query->style = conf->style;
-		query->idn = conf->idn;
-		query->nsid = conf->nsid;
-		query->edns = conf->edns;
-		query->padding = conf->padding;
-		query->alignment = conf->alignment;
 		tls_params_copy(&query->tls, &conf->tls);
 		if (conf->tsig_key.name != NULL) {
 			int ret = knot_tsig_key_copy(&query->tsig_key,
@@ -1183,20 +1228,21 @@ query_t *query_create(const char *owner, const query_t *conf)
 				return NULL;
 			}
 		}
-		if (conf->subnet != NULL) {
-			query->subnet = malloc(sizeof(*query->subnet));
-			if (query->subnet == NULL) {
-				query_free(query);
-				return NULL;
-			}
-			*(query->subnet) = *(conf->subnet);
-		} else {
-			query->subnet = NULL;
-		}
 #if USE_DNSTAP
 		query->dt_reader = conf->dt_reader;
 		query->dt_writer = conf->dt_writer;
 #endif // USE_DNSTAP
+	}
+
+	// Initialize list of servers.
+	init_list(&query->servers);
+
+	// Set the query owner if any.
+	if (owner != NULL) {
+		if ((query->owner = strdup(owner)) == NULL) {
+			query_free(query);
+			return NULL;
+		}
 	}
 
 	// Check dynamic allocation.
@@ -1247,7 +1293,6 @@ void query_free(query_t *query)
 
 	free(query->owner);
 	free(query->port);
-	free(query->subnet);
 	free(query);
 }
 
@@ -1671,6 +1716,8 @@ static void print_help(void)
 	       "       +[no]edns[=N]         Use EDNS(=version).\n"
 	       "       +[no]time=T           Set wait for reply interval in seconds.\n"
 	       "       +[no]retry=N          Set number of retries.\n"
+	       "       +[no]cookie=HEX       Attach EDNS(0) cookie to the query.\n"
+	       "       +[no]badcookie        Repeat a query with the correct cookie.\n"
 	       "       +noidn                Disable IDN transformation.\n"
 	       "\n"
 	       "       -h, --help            Print the program help.\n"

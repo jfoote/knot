@@ -299,6 +299,7 @@ static_modules_declars=""
 static_modules_init=""
 doc_modules=""
 
+KNOT_MODULE([cookies],     "yes")
 KNOT_MODULE([dnsproxy],    "yes", "non-shareable")
 KNOT_MODULE([dnstap],      "no")
 KNOT_MODULE([noudp],       "yes")
@@ -592,6 +593,7 @@ $result_msg_base
 AC_DEFINE_UNQUOTED([CONFIGURE_SUMMARY],["$result_msg_esc"],[Configure summary])
 
 AC_CONFIG_FILES([Makefile
+                 Doxyfile
                  doc/Makefile
                  libtap/Makefile
                  tests/Makefile

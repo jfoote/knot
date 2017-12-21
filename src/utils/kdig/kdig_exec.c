@@ -266,17 +266,36 @@ static int add_query_edns(knot_pkt_t *packet, const query_t *query, uint16_t max
 	}
 
 	/* Append EDNS-client-subnet. */
-	if (query->subnet != NULL) {
-		size_t size = knot_edns_client_subnet_size(query->subnet);
+	if (query->subnet.family != AF_UNSPEC) {
+		size_t size = knot_edns_client_subnet_size(&query->subnet);
 		uint8_t data[size];
 
-		ret = knot_edns_client_subnet_write(data, size, query->subnet);
+		ret = knot_edns_client_subnet_write(data, size, &query->subnet);
 		if (ret != KNOT_EOK) {
 			knot_rrset_clear(&opt_rr, &packet->mm);
 			return ret;
 		}
 
 		ret = knot_edns_add_option(&opt_rr, KNOT_EDNS_OPTION_CLIENT_SUBNET,
+		                           size, data, &packet->mm);
+		if (ret != KNOT_EOK) {
+			knot_rrset_clear(&opt_rr, &packet->mm);
+			return ret;
+		}
+	}
+
+	/* Append a cookie option if present. */
+	if (query->cc.len > 0) {
+		size_t size = knot_edns_cookie_size(&query->cc, &query->sc);
+		uint8_t data[size];
+
+		ret = knot_edns_cookie_write(data, size, &query->cc, &query->sc);
+		if (ret != KNOT_EOK) {
+			knot_rrset_clear(&opt_rr, &packet->mm);
+			return ret;
+		}
+
+		ret = knot_edns_add_option(&opt_rr, KNOT_EDNS_OPTION_COOKIE,
 		                           size, data, &packet->mm);
 		if (ret != KNOT_EOK) {
 			knot_rrset_clear(&opt_rr, &packet->mm);
@@ -325,8 +344,8 @@ static bool do_padding(const query_t *query)
 static bool use_edns(const query_t *query)
 {
 	return query->edns > -1 || query->udp_size > -1 || query->nsid ||
-	       query->flags.do_flag || query->subnet != NULL ||
-	       do_padding(query);
+	       query->flags.do_flag || query->subnet.family != AF_UNSPEC ||
+	       query->cc.len > 0 || do_padding(query);
 }
 
 static knot_pkt_t *create_query_packet(const query_t *query)
@@ -667,7 +686,8 @@ static int process_query_packet(const knot_pkt_t      *query,
 	// Check for TC bit and repeat query with TCP if required.
 	if (knot_wire_get_tc(reply->wire) != 0 &&
 	    ignore_tc == false && net->socktype == SOCK_DGRAM) {
-		WARN("truncated reply from %s, retrying over TCP\n",
+		printf("\n");
+		WARN("truncated reply from %s, retrying over TCP\n\n",
 		     net->remote_str);
 		knot_pkt_free(&reply);
 		net_close(net);
@@ -695,6 +715,45 @@ static int process_query_packet(const knot_pkt_t      *query,
 			WARN("reply verification for %s (%s)\n",
 			     net->remote_str, knot_strerror(ret));
 		}
+	}
+
+	// Check for BADCOOKIE RCODE and repeat query with the new cookie if required.
+	if (knot_pkt_ext_rcode(reply) == KNOT_RCODE_BADCOOKIE && query_ctx->badcookie) {
+		printf("\n");
+		WARN("bad cookie from %s, retrying with the received one\n",
+		     net->remote_str);
+		net_close(net);
+
+		// Prepare new query context.
+		query_t new_ctx = *query_ctx;
+
+		uint8_t *opt = knot_edns_get_option(reply->opt_rr, KNOT_EDNS_OPTION_COOKIE);
+		if (opt == NULL) {
+			ERR("bad cookie, missing EDNS section\n");
+			knot_pkt_free(&reply);
+			return -1;
+		}
+
+		const uint8_t *data = knot_edns_opt_get_data(opt);
+		uint16_t data_len = knot_edns_opt_get_length(opt);
+		int ret = knot_edns_cookie_parse(&new_ctx.cc, &new_ctx.sc,
+		                                 data, data_len);
+		if (ret != KNOT_EOK) {
+			knot_pkt_free(&reply);
+			ERR("bad cookie, missing EDNS cookie option\n");
+			return -1;
+		}
+		knot_pkt_free(&reply);
+
+		// Restore the original client cookie.
+		new_ctx.cc = query_ctx->cc;
+
+		knot_pkt_t *new_query = create_query_packet(&new_ctx);
+		ret = process_query_packet(new_query, net, &new_ctx, ignore_tc,
+		                           sign_ctx, style);
+		knot_pkt_free(&new_query);
+
+		return ret;
 	}
 
 	knot_pkt_free(&reply);
