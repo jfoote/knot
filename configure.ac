@@ -524,6 +524,7 @@ AX_CODE_COVERAGE
 AX_SANITIZER
 AS_IF([test -n "$sanitize_CFLAGS"], [CFLAGS="$CFLAGS $sanitize_CFLAGS"])
 AM_CONDITIONAL([SANITIZE_FUZZER], [test "$with_sanitize_fuzzer" != "no"])
+AM_CONDITIONAL([OSS_FUZZ], [test "$with_oss_fuzz" != "no"])
 
 AS_IF([test "$enable_documentation" = "yes"],[
 

@@ -13,7 +13,7 @@
 # with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #
-# Processes --with-sanitize= flags, checks
+# Processes --with-sanitize and --with-oss-fuzz flags, checks
 # if the options are supported by the compiler, and sets the following
 # variables accordingly:
 #
@@ -33,6 +33,11 @@ AC_DEFUN([AX_SANITIZER], [
     [AS_HELP_STRING([--with-sanitize-fuzzer], [Compile with sanitizer fuzzer (require clang >= 6.0) [default=no]])],
     [],
     [with_sanitize_fuzzer=no]
+  )
+  AC_ARG_WITH([oss-fuzz],
+    [AS_HELP_STRING([--with-oss-fuzz], [Link for oss-fuzz environment [default=no]])],
+    [],
+    [with_oss_fuzz=no]
   )
 
   # Using -fsanitize=fuzzer requires clang >= 6.0
