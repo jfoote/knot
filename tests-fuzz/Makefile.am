@@ -23,6 +23,11 @@ if SANITIZE_FUZZER
 packet_libfuzzer_LDFLAGS = -fsanitize=fuzzer
 zscanner_libfuzzer_LDFLAGS = -fsanitize=fuzzer
 
+# Ensure that fuzzers execute successfully with a benign input
+
+TESTS = check_fuzzers.test
+EXTRA_DIST = check_fuzzers.test
+
 if OSS_FUZZ
 packet_libfuzzer_LDADD += -lFuzzingEngine
 zscanner_libfuzzer_LDADD += -lFuzzingEngine
