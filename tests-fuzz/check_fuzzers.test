@@ -1,8 +1,0 @@
-#!/bin/bash
-
-# Ensures that fuzzers execute successfully with benign input
-
-set -e
-
-./packet_libfuzzer sample-seed.pkt
-./zscanner_libfuzzer sample-seed.pkt

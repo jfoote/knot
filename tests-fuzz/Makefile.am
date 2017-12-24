@@ -25,8 +25,8 @@ zscanner_libfuzzer_LDFLAGS = -fsanitize=fuzzer
 
 # Ensure that fuzzers execute successfully with a benign input
 
-TESTS = check_fuzzers.test
-EXTRA_DIST = check_fuzzers.test
+TESTS = check/check_fuzzers.test
+EXTRA_DIST = check/check_fuzzers.test
 
 if OSS_FUZZ
 packet_libfuzzer_LDADD += -lFuzzingEngine
